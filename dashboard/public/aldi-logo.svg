@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- ALDI SÜD logo — stylized diagonal lines forming an A -->
+  <g stroke="#4DB8D4" stroke-width="6" stroke-linecap="round">
+    <line x1="10" y1="85" x2="35" y2="10" />
+    <line x1="22" y1="85" x2="47" y2="10" />
+    <line x1="34" y1="85" x2="59" y2="10" />
+    <line x1="46" y1="85" x2="71" y2="10" />
+    <line x1="58" y1="85" x2="83" y2="10" />
+    <line x1="70" y1="85" x2="83" y2="45" />
+    <line x1="82" y1="85" x2="83" y2="75" />
+  </g>
+</svg>

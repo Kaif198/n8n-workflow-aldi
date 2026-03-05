@@ -1,0 +1,265 @@
+{
+  "name": "ALDI SUD Supply Chain Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "supply-chain-ingest",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-ingest",
+      "name": "Webhook Ingest",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "manualTriggerNotice": "CSV Bulk Ingest"
+      },
+      "id": "manual-trigger",
+      "name": "Manual CSV Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [220, 520]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Stage 2 — Normalise\n// Handles both webhook JSON and CSV payloads\n\nconst items = $input.all();\nlet records = [];\nlet source = 'webhook';\nconst runId = 'RUN-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + Math.random().toString(36).substr(2,5).toUpperCase();\nconst startTime = Date.now();\n\n// Determine source and extract records\nconst firstItem = items[0]?.json;\n\nif (firstItem && firstItem.records && Array.isArray(firstItem.records)) {\n  // Webhook payload: { supplier_id, records: [...] }\n  records = firstItem.records.map(r => ({ ...r, supplier_id: r.supplier_id || firstItem.supplier_id }));\n  source = 'webhook';\n} else if (items.length > 0 && (firstItem?.Supplier_ID || firstItem?.supplier_id)) {\n  // CSV rows or flat webhook array\n  source = items[0]?.json?.Supplier_ID ? 'csv' : 'webhook';\n  \n  if (source === 'csv') {\n    // Validate CSV headers\n    const requiredHeaders = ['Supplier_ID', 'SKU_Code', 'Delivery_Date', 'Weight_KG', 'Lead_Time_Days', 'Origin_Country'];\n    const presentHeaders = Object.keys(firstItem);\n    const missingHeaders = requiredHeaders.filter(h => !presentHeaders.includes(h));\n    \n    if (missingHeaders.length > 0) {\n      // Reject entire CSV — missing headers\n      return [{\n        json: {\n          error: true,\n          runId: runId,\n          startTime: startTime,\n          supplier_id: firstItem.Supplier_ID || 'UNKNOWN',\n          rejection: 'CSV_HEADER_MISSING',\n          missingHeaders: missingHeaders,\n          totalRecords: 0,\n          cleanRecords: [],\n          flaggedRecords: []\n        }\n      }];\n    }\n    \n    // Map CSV headers to internal field names\n    records = items.map(item => ({\n      supplier_id: item.json.Supplier_ID,\n      sku_code: item.json.SKU_Code,\n      delivery_date: item.json.Delivery_Date,\n      weight_kg: item.json.Weight_KG,\n      lead_time_days: item.json.Lead_Time_Days,\n      origin_country: item.json.Origin_Country\n    }));\n  } else {\n    records = items.map(item => item.json);\n  }\n}\n\n// Normalise each record\nconst normalised = [];\nconst parseErrors = [];\n\nfor (const rec of records) {\n  const norm = {};\n  \n  // supplier_id\n  norm.supplier_id = rec.supplier_id ? String(rec.supplier_id).trim() : null;\n  \n  // sku_code\n  norm.sku_code = rec.sku_code ? String(rec.sku_code).trim() : '';\n  \n  // delivery_date — coerce to ISO 8601\n  try {\n    if (rec.delivery_date) {\n      const d = new Date(rec.delivery_date);\n      if (isNaN(d.getTime())) throw new Error('Invalid date');\n      norm.delivery_date = d.toISOString().slice(0, 10);\n    } else {\n      norm.delivery_date = null;\n    }\n  } catch (e) {\n    parseErrors.push({\n      ...rec,\n      record_id: 'REC-' + Math.random().toString(36).substr(2,9).toUpperCase(),\n      run_id: runId,\n      status: 'flagged',\n      flag_reason: 'PARSE_ERROR: delivery_date could not be parsed (value: ' + rec.delivery_date + ')',\n      flag_severity: 'LOW'\n    });\n    continue;\n  }\n  \n  // weight_kg — coerce to number\n  const wRaw = rec.weight_kg;\n  const wNum = Number(wRaw);\n  if (wRaw !== null && wRaw !== undefined && wRaw !== '' && isNaN(wNum)) {\n    parseErrors.push({\n      ...rec,\n      record_id: 'REC-' + Math.random().toString(36).substr(2,9).toUpperCase(),\n      run_id: runId,\n      status: 'flagged',\n      flag_reason: 'PARSE_ERROR: weight_kg could not be parsed as number (value: ' + wRaw + ')',\n      flag_severity: 'LOW'\n    });\n    continue;\n  }\n  norm.weight_kg = wNum;\n  \n  // lead_time_days — coerce to integer\n  const ltRaw = rec.lead_time_days;\n  const ltNum = parseInt(ltRaw, 10);\n  if (ltRaw !== null && ltRaw !== undefined && ltRaw !== '' && isNaN(ltNum)) {\n    parseErrors.push({\n      ...rec,\n      record_id: 'REC-' + Math.random().toString(36).substr(2,9).toUpperCase(),\n      run_id: runId,\n      status: 'flagged',\n      flag_reason: 'PARSE_ERROR: lead_time_days could not be parsed as integer (value: ' + ltRaw + ')',\n      flag_severity: 'LOW'\n    });\n    continue;\n  }\n  norm.lead_time_days = ltNum;\n  \n  // origin_country\n  norm.origin_country = rec.origin_country ? String(rec.origin_country).trim().toUpperCase() : '';\n  \n  norm.record_id = 'REC-' + Math.random().toString(36).substr(2,9).toUpperCase();\n  norm.run_id = runId;\n  \n  normalised.push(norm);\n}\n\nreturn [{\n  json: {\n    runId: runId,\n    startTime: startTime,\n    supplier_id: records.length > 0 ? (records[0].supplier_id || 'UNKNOWN') : 'UNKNOWN',\n    normalisedRecords: normalised,\n    parseErrors: parseErrors,\n    totalRecords: records.length\n  }\n}];"
+      },
+      "id": "normalise",
+      "name": "Normalise Records",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [480, 400]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Stage 3 — Validate\n// Apply business rules to each normalised record\n\nconst input = $input.first().json;\nconst { runId, startTime, supplier_id, normalisedRecords, parseErrors, totalRecords } = input;\n\nconst cleanRecords = [];\nconst flaggedRecords = [...parseErrors]; // start with parse errors from Stage 2\n\nconst skuPattern = /^[A-Z]{2}[0-9]{6}$/;\nconst countryPattern = /^[A-Z]{2}$/;\nconst now = new Date();\nconst ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);\n\nfor (const rec of normalisedRecords) {\n  const issues = [];\n  \n  // Rule 1: delivery_date must be valid ISO 8601 and not more than 90 days in the past\n  if (!rec.delivery_date) {\n    issues.push({ field: 'delivery_date', reason: 'delivery_date is missing or null', severity: 'HIGH' });\n  } else {\n    const dd = new Date(rec.delivery_date);\n    if (isNaN(dd.getTime())) {\n      issues.push({ field: 'delivery_date', reason: 'delivery_date is not a valid ISO 8601 date (value: ' + rec.delivery_date + ')', severity: 'LOW' });\n    } else if (dd < ninetyDaysAgo) {\n      issues.push({ field: 'delivery_date', reason: 'delivery_date is more than 90 days in the past (value: ' + rec.delivery_date + ')', severity: 'HIGH' });\n    }\n  }\n  \n  // Rule 2: weight_kg must be a positive number greater than zero\n  if (rec.weight_kg === null || rec.weight_kg === undefined || isNaN(rec.weight_kg) || rec.weight_kg <= 0) {\n    issues.push({ field: 'weight_kg', reason: 'weight_kg must be a positive number greater than zero (value: ' + rec.weight_kg + ')', severity: 'HIGH' });\n  }\n  \n  // Rule 3: sku_code must match [A-Z]{2}[0-9]{6}\n  if (!rec.sku_code || !skuPattern.test(rec.sku_code)) {\n    issues.push({ field: 'sku_code', reason: 'sku_code is empty or does not match pattern [A-Z]{2}[0-9]{6} (value: ' + (rec.sku_code || '') + ')', severity: 'LOW' });\n  }\n  \n  // Rule 4: lead_time_days must be integer 1-14; >14 is CRITICAL\n  if (rec.lead_time_days === null || rec.lead_time_days === undefined || isNaN(rec.lead_time_days)) {\n    issues.push({ field: 'lead_time_days', reason: 'lead_time_days is missing or not a valid integer', severity: 'HIGH' });\n  } else if (rec.lead_time_days < 1) {\n    issues.push({ field: 'lead_time_days', reason: 'lead_time_days must be at least 1 (value: ' + rec.lead_time_days + ')', severity: 'HIGH' });\n  } else if (rec.lead_time_days > 14) {\n    issues.push({ field: 'lead_time_days', reason: 'lead_time_days exceeds 14-day SLA limit (value: ' + rec.lead_time_days + ')', severity: 'CRITICAL' });\n  }\n  \n  // Rule 5: origin_country must be 2-char ISO 3166-1 alpha-2\n  if (!rec.origin_country || !countryPattern.test(rec.origin_country)) {\n    issues.push({ field: 'origin_country', reason: 'origin_country is not a valid ISO 3166-1 alpha-2 code (value: ' + (rec.origin_country || '') + ')', severity: 'MEDIUM' });\n  }\n  \n  // Rule 6: supplier_id must be present and non-null\n  if (!rec.supplier_id) {\n    issues.push({ field: 'supplier_id', reason: 'supplier_id is missing or null', severity: 'HIGH' });\n  }\n  \n  if (issues.length > 0) {\n    // Take the highest severity\n    const severityOrder = { 'CRITICAL': 4, 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };\n    issues.sort((a, b) => (severityOrder[b.severity] || 0) - (severityOrder[a.severity] || 0));\n    const highestSeverity = issues[0].severity;\n    const allReasons = issues.map(i => i.reason).join('; ');\n    \n    flaggedRecords.push({\n      ...rec,\n      status: 'flagged',\n      flag_reason: allReasons,\n      flag_severity: highestSeverity,\n      flagged_fields: issues\n    });\n  } else {\n    cleanRecords.push({\n      ...rec,\n      status: 'clean',\n      flag_reason: null,\n      flag_severity: null\n    });\n  }\n}\n\nreturn [{\n  json: {\n    runId: runId,\n    startTime: startTime,\n    supplier_id: supplier_id,\n    totalRecords: totalRecords,\n    cleanRecords: cleanRecords,\n    flaggedRecords: flaggedRecords,\n    hasCritical: flaggedRecords.some(r => r.flag_severity === 'CRITICAL'),\n    error: input.error || false,\n    rejection: input.rejection || null\n  }\n}];"
+      },
+      "id": "validate",
+      "name": "Validate Records",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [720, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT supplier_name, region FROM supplier_reference WHERE supplier_id = '{{ $json.supplier_id }}' LIMIT 1"
+      },
+      "id": "enrich-lookup",
+      "name": "Enrich Supplier Lookup",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [960, 400],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "Neon Postgres"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "functionCode": "// Merge enrichment data back into the records\n\nconst input = $input.first().json;\nconst enrichResult = $node['Enrich Supplier Lookup'].json;\n\nconst supplierName = enrichResult?.supplier_name || input.supplier_id;\nconst supplierRegion = enrichResult?.region || 'Unknown';\n\n// Append supplier info to all clean records\nconst enrichedClean = (input.cleanRecords || []).map(r => ({\n  ...r,\n  supplier_name: supplierName,\n  supplier_region: supplierRegion\n}));\n\nconst enrichedFlagged = (input.flaggedRecords || []).map(r => ({\n  ...r,\n  supplier_name: supplierName,\n  supplier_region: supplierRegion\n}));\n\nconst duration = Date.now() - input.startTime;\n\nreturn [{\n  json: {\n    ...input,\n    supplier_name: supplierName,\n    cleanRecords: enrichedClean,\n    flaggedRecords: enrichedFlagged,\n    duration_ms: duration\n  }\n}];"
+      },
+      "id": "enrich-merge",
+      "name": "Merge Enrichment",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1200, 400]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO pipeline_runs (run_id, supplier_id, supplier_name, total_records, clean_records, flagged_records, duration_ms) VALUES ('{{ $json.runId }}', '{{ $json.supplier_id }}', '{{ $json.supplier_name }}', {{ $json.totalRecords }}, {{ $json.cleanRecords.length }}, {{ $json.flaggedRecords.length }}, {{ $json.duration_ms }})"
+      },
+      "id": "store-run",
+      "name": "Store Pipeline Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [1440, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "Neon Postgres"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "functionCode": "// Stage 5 — Prepare individual record inserts\n\nconst input = $input.first().json;\nconst allRecords = [...(input.cleanRecords || []), ...(input.flaggedRecords || [])];\n\nif (allRecords.length === 0) {\n  return [{ json: { ...input, recordsStored: 0 } }];\n}\n\n// Build parameterised VALUES\nconst values = allRecords.map(r => {\n  const rid = r.record_id || ('REC-' + Math.random().toString(36).substr(2,9).toUpperCase());\n  const sku = (r.sku_code || '').replace(/'/g, \"''\");\n  const dd = r.delivery_date || null;\n  const wkg = r.weight_kg !== undefined && r.weight_kg !== null ? r.weight_kg : 'NULL';\n  const lt = r.lead_time_days !== undefined && r.lead_time_days !== null ? r.lead_time_days : 'NULL';\n  const oc = (r.origin_country || '').replace(/'/g, \"''\");\n  const st = r.status || 'clean';\n  const fr = r.flag_reason ? r.flag_reason.replace(/'/g, \"''\") : null;\n  const fs = r.flag_severity || null;\n  \n  return `('${rid}', '${input.runId}', '${r.supplier_id}', '${sku}', ${dd ? \"'\" + dd + \"'\" : 'NULL'}, ${wkg}, ${lt}, '${oc}', '${st}', ${fr ? \"'\" + fr + \"'\" : 'NULL'}, ${fs ? \"'\" + fs + \"'\" : 'NULL'})`;\n}).join(',\\n');\n\nreturn [{\n  json: {\n    ...input,\n    insertQuery: `INSERT INTO pipeline_records (record_id, run_id, supplier_id, sku_code, delivery_date, weight_kg, lead_time_days, origin_country, status, flag_reason, flag_severity) VALUES ${values}`,\n    recordsStored: allRecords.length\n  }\n}];"
+      },
+      "id": "prepare-records",
+      "name": "Prepare Record Inserts",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1440, 520]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.insertQuery }}"
+      },
+      "id": "store-records",
+      "name": "Store Pipeline Records",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [1680, 520],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "Neon Postgres"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.hasCritical }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "check-critical",
+      "name": "Has Critical Flags?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1920, 400]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.N8N_SMTP_SENDER }}",
+        "toEmail": "={{ $env.N8N_ALERT_RECIPIENT }}",
+        "subject": "=CRITICAL Alert — Pipeline Run {{ $json.runId }} — {{ $json.supplier_name }}",
+        "text": "=ALDI SUD Supply Chain Pipeline — CRITICAL Alert\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nRun ID:          {{ $json.runId }}\nSupplier:        {{ $json.supplier_name }} ({{ $json.supplier_id }})\nTimestamp:       {{ new Date().toISOString() }}\nTotal Records:   {{ $json.totalRecords }}\nCritical Flags:  {{ $json.flaggedRecords.filter(r => r.flag_severity === 'CRITICAL').length }}\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\nCRITICAL Issues:\n{{ $json.flaggedRecords.filter(r => r.flag_severity === 'CRITICAL').map(r => '• Record ' + r.record_id + ' — ' + r.flag_reason).join('\\n') }}\n\nPlease review these records in the Operations Dashboard.\n\n— ALDI SUD Supply Chain Intelligence Pipeline",
+        "options": {
+          "smtpHost": "={{ $env.N8N_SMTP_HOST }}",
+          "smtpPort": "={{ $env.N8N_SMTP_PORT }}",
+          "smtpUser": "={{ $env.N8N_SMTP_USER }}",
+          "smtpPass": "={{ $env.N8N_SMTP_PASSWORD }}"
+        }
+      },
+      "id": "send-alert",
+      "name": "Send Critical Alert Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [2160, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"success\",\n  \"runId\": \"{{ $json.runId }}\",\n  \"totalRecords\": {{ $json.totalRecords }},\n  \"cleanRecords\": {{ $json.cleanRecords.length }},\n  \"flaggedRecords\": {{ $json.flaggedRecords.length }},\n  \"criticalFlags\": {{ $json.flaggedRecords.filter(r => r.flag_severity === 'CRITICAL').length }},\n  \"duration_ms\": {{ $json.duration_ms }}\n}"
+      },
+      "id": "respond-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2400, 400]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Error handler — check for DB failures and set error response\nconst input = $input.first().json;\n\n// If we got here via continueOnFail from a Postgres node\nif (input.error || input.errorMessage) {\n  return [{\n    json: {\n      httpStatus: 500,\n      errorMessage: 'Database write failed: ' + (input.errorMessage || 'Unknown error'),\n      runId: input.runId || 'UNKNOWN'\n    }\n  }];\n}\n\nreturn [{ json: input }];"
+      },
+      "id": "error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1680, 700]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"error\",\n  \"message\": \"{{ $json.errorMessage }}\",\n  \"runId\": \"{{ $json.runId }}\"\n}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "respond-error",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1920, 700]
+    }
+  ],
+  "connections": {
+    "Webhook Ingest": {
+      "main": [
+        [{ "node": "Normalise Records", "type": "main", "index": 0 }]
+      ]
+    },
+    "Manual CSV Trigger": {
+      "main": [
+        [{ "node": "Normalise Records", "type": "main", "index": 0 }]
+      ]
+    },
+    "Normalise Records": {
+      "main": [
+        [{ "node": "Validate Records", "type": "main", "index": 0 }]
+      ]
+    },
+    "Validate Records": {
+      "main": [
+        [{ "node": "Enrich Supplier Lookup", "type": "main", "index": 0 }]
+      ]
+    },
+    "Enrich Supplier Lookup": {
+      "main": [
+        [{ "node": "Merge Enrichment", "type": "main", "index": 0 }]
+      ]
+    },
+    "Merge Enrichment": {
+      "main": [
+        [
+          { "node": "Store Pipeline Run", "type": "main", "index": 0 },
+          { "node": "Prepare Record Inserts", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Store Pipeline Run": {
+      "main": [
+        [{ "node": "Has Critical Flags?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Prepare Record Inserts": {
+      "main": [
+        [{ "node": "Store Pipeline Records", "type": "main", "index": 0 }]
+      ]
+    },
+    "Store Pipeline Records": {
+      "main": [
+        [{ "node": "Has Critical Flags?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Has Critical Flags?": {
+      "main": [
+        [{ "node": "Send Critical Alert Email", "type": "main", "index": 0 }],
+        [{ "node": "Respond Success", "type": "main", "index": 0 }]
+      ]
+    },
+    "Send Critical Alert Email": {
+      "main": [
+        [{ "node": "Respond Success", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "supply-chain" },
+    { "name": "aldi-sud" }
+  ],
+  "triggerCount": 2,
+  "active": true
+}

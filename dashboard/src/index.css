@@ -1,0 +1,114 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-aldi-blue: #00529B;
+  --color-aldi-blue-dark: #003C73;
+  --color-aldi-blue-light: #EBF3FB;
+  --color-aldi-yellow: #FFD700;
+  --color-surface: #F8F9FC;
+  --color-surface-raised: #FFFFFF;
+  --color-text-primary: #111827;
+  --color-text-secondary: #6B7280;
+  --color-text-tertiary: #9CA3AF;
+  --color-success: #16A34A;
+  --color-success-bg: #ECFDF5;
+  --color-warning: #CA8A04;
+  --color-warning-bg: #FFFBEB;
+  --color-error: #DC2626;
+  --color-error-bg: #FEF2F2;
+  --color-border: #E5E7EB;
+  --color-border-light: #F3F4F6;
+  --color-hover-bg: #EBF3FB;
+  --font-family-inter: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-family-inter);
+  color: var(--color-text-primary);
+  background-color: var(--color-surface);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+}
+
+/* View transition fade */
+.view-enter {
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.view-active {
+  opacity: 1;
+  transition: opacity 200ms ease;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D1D5DB;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9CA3AF;
+}
+
+/* Pulse animation for live indicator */
+@keyframes pulse-dot {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* Gradient border effect */
+.gradient-border {
+  position: relative;
+}
+
+.gradient-border::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #00529B, #FFD700);
+  border-radius: 0 0 8px 8px;
+}
+
+/* Workflow node connector lines */
+.workflow-connector {
+  background: linear-gradient(90deg, #00529B 60%, transparent 60%);
+  background-size: 12px 2px;
+  background-repeat: repeat-x;
+  background-position: center;
+}
