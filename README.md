@@ -2,6 +2,13 @@
 
 Automated supply chain data pipeline with n8n workflow orchestration, Neon PostgreSQL, and a React operations dashboard.
 
+## Live Deployment
+
+| Service | URL |
+|---------|-----|
+| **Dashboard** | [n8n-workflow-aldi.vercel.app](https://n8n-workflow-aldi.vercel.app) |
+| **Webhook Endpoint** | `POST https://kaif198.app.n8n.cloud/webhook/supply-chain-ingest` |
+
 ---
 
 ## Architecture
@@ -83,7 +90,7 @@ Set the following environment variables in the Railway service:
 5. Configure the **Neon Postgres** credential in n8n (Settings → Credentials)
 6. Activate the workflow
 
-The webhook URL will be: `https://<your-railway-domain>/webhook/supply-chain-ingest`
+The webhook URL will be: `https://kaif198.app.n8n.cloud/webhook/supply-chain-ingest`
 
 ---
 
@@ -125,7 +132,7 @@ This creates:
 
 ## Webhook Payload Format
 
-**Endpoint:** `POST https://<your-railway-domain>/webhook/supply-chain-ingest`
+**Endpoint:** `POST https://kaif198.app.n8n.cloud/webhook/supply-chain-ingest`
 
 **Content-Type:** `application/json`
 
@@ -156,7 +163,7 @@ This creates:
 **Example curl command:**
 
 ```bash
-curl -X POST https://<your-railway-domain>/webhook/supply-chain-ingest \
+curl -X POST https://kaif198.app.n8n.cloud/webhook/supply-chain-ingest \
   -H "Content-Type: application/json" \
   -d '{
     "supplier_id": "SUP-AT-001",
