@@ -50,7 +50,10 @@ export default function NavBar({ currentView, navigate, onRefresh, isLoading }) 
                     </div>
 
                     {/* Refresh + Status */}
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-4">
+                        <div className="text-[11px] font-medium text-[#6B7280] hidden md:block tracking-wide">
+                            Created by Mohammed Kaif Ahmed
+                        </div>
                         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#ECFDF5] border border-[#BBF7D0]">
                             <div className="w-1.5 h-1.5 rounded-full bg-[#16A34A] animate-pulse-dot" />
                             <span className="text-[11px] font-semibold text-[#16A34A]">Live</span>
