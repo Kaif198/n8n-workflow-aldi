@@ -3,19 +3,19 @@ import KPITile from '../components/KPITile';
 import RunsTable from '../components/RunsTable';
 import { calcTrend } from '../lib/formatters';
 import {
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 
 const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload) return null;
     return (
-        <div className="bg-white/95 backdrop-blur-sm border border-[#E5E7EB] rounded-xl px-4 py-3 shadow-xl">
+        <div className="bg-white/95 backdrop-blur-md border border-[#E5E7EB] rounded-xl px-4 py-3 shadow-xl">
             <p className="text-xs font-bold text-[#111827] mb-1.5">{label}</p>
             {payload.map((p, i) => (
                 <div key={i} className="flex items-center gap-2 text-xs">
                     <span className="w-2 h-2 rounded-full" style={{ backgroundColor: p.fill }} />
                     <span className="text-[#6B7280]">{p.name}:</span>
-                    <span className="font-bold text-[#111827]">{p.value}</span>
+                    <span className="font-bold text-[#111827] tabular-nums">{p.value}</span>
                 </div>
             ))}
         </div>
@@ -58,24 +58,24 @@ export default function Overview({ kpis, dailyVolume, runs, navigate }) {
     return (
         <div className="space-y-6">
             {/* Page Header */}
-            <div>
+            <div className="animate-fade-in-up">
                 <h1 className="text-2xl font-extrabold text-[#111827] tracking-tight">Pipeline Overview</h1>
                 <p className="text-sm text-[#6B7280] mt-0.5">Real-time pipeline health and record processing status</p>
             </div>
 
             {/* KPI Tiles */}
             <div className="grid grid-cols-4 gap-4">
-                {tiles.map((tile) => (
-                    <KPITile key={tile.title} {...tile} />
+                {tiles.map((tile, i) => (
+                    <KPITile key={tile.title} {...tile} delay={i * 80} />
                 ))}
             </div>
 
             {/* 7-Day Volume Chart */}
-            <div className="bg-white rounded-2xl border border-[#E5E7EB] p-6 shadow-sm">
+            <div className="animate-fade-in-up bg-white rounded-2xl border border-[#E5E7EB] p-6 shadow-sm card-hover" style={{ '--delay': '350ms' }}>
                 <div className="flex items-center justify-between mb-5">
                     <div>
                         <h2 className="text-sm font-bold text-[#111827]">Daily Record Volume</h2>
-                        <p className="text-xs text-[#9CA3AF] mt-0.5">Last 7 days — clean vs flagged breakdown</p>
+                        <p className="text-xs text-[#9CA3AF] mt-0.5">Last 7 days - clean vs flagged breakdown</p>
                     </div>
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-1.5">
@@ -90,7 +90,11 @@ export default function Overview({ kpis, dailyVolume, runs, navigate }) {
                 </div>
                 {chartData.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12">
-                        <div className="text-4xl mb-2">📈</div>
+                        <div className="w-14 h-14 mb-3 rounded-2xl bg-[#F3F4F6] flex items-center justify-center">
+                            <svg className="w-7 h-7 text-[#9CA3AF]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                        </div>
                         <p className="text-sm text-[#6B7280]">No data available for the past 7 days.</p>
                     </div>
                 ) : (
@@ -108,7 +112,7 @@ export default function Overview({ kpis, dailyVolume, runs, navigate }) {
             </div>
 
             {/* Recent Pipeline Runs */}
-            <div>
+            <div className="animate-fade-in-up" style={{ '--delay': '450ms' }}>
                 <div className="flex items-center justify-between mb-3">
                     <div>
                         <h2 className="text-sm font-bold text-[#111827]">Recent Pipeline Runs</h2>

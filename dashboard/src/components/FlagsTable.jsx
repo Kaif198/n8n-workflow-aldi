@@ -7,7 +7,7 @@ export default function FlagsTable({ records }) {
 
     if (!records || records.length === 0) {
         return (
-            <div className="bg-white rounded-2xl border border-[#E5E7EB] p-12 text-center">
+            <div className="animate-fade-in-up bg-white rounded-2xl border border-[#E5E7EB] p-12 text-center">
                 <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-[#ECFDF5] flex items-center justify-center">
                     <svg className="w-7 h-7 text-[#16A34A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -45,9 +45,9 @@ export default function FlagsTable({ records }) {
     });
 
     function extractField(reason) {
-        if (!reason) return '—';
+        if (!reason) return '-';
         const match = reason.match(/^(\w+)/);
-        return match ? match[1] : '—';
+        return match ? match[1] : '-';
     }
 
     const columns = [
@@ -59,10 +59,10 @@ export default function FlagsTable({ records }) {
     ];
 
     return (
-        <div className="bg-white rounded-2xl border border-[#E5E7EB] overflow-hidden shadow-sm">
+        <div className="animate-fade-in-up bg-white rounded-2xl border border-[#E5E7EB] overflow-hidden shadow-sm" style={{ '--delay': '100ms' }}>
             <table className="w-full text-sm">
                 <thead>
-                    <tr className="border-b border-[#F3F4F6]">
+                    <tr className="border-b border-[#F3F4F6] bg-[#FAFBFC]">
                         {columns.map((col) => (
                             <th
                                 key={col.key}
@@ -72,7 +72,9 @@ export default function FlagsTable({ records }) {
                                 <span className="flex items-center gap-1.5">
                                     {col.label}
                                     {sortField === col.key && (
-                                        <span className="text-[#00529B] text-xs">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                                        <svg className={`w-3 h-3 text-[#00529B] transition-transform duration-200 ${sortDir === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
+                                        </svg>
                                     )}
                                 </span>
                             </th>
@@ -83,13 +85,12 @@ export default function FlagsTable({ records }) {
                     {sorted.map((rec, i) => (
                         <tr
                             key={rec.record_id}
-                            className={`border-b border-[#F3F4F6] hover:bg-[#F8F9FC] transition-colors duration-150 ${i === sorted.length - 1 ? 'border-b-0' : ''
-                                }`}
+                            className={`table-row-hover ${i < sorted.length - 1 ? 'border-b border-[#F3F4F6]' : ''}`}
                         >
                             <td className="px-5 py-3.5">
                                 <span className="font-mono text-xs bg-[#F3F4F6] px-2 py-0.5 rounded font-medium">{rec.record_id}</span>
                             </td>
-                            <td className="px-5 py-3.5 font-mono text-xs font-medium">{rec.sku_code || '—'}</td>
+                            <td className="px-5 py-3.5 font-mono text-xs font-medium">{rec.sku_code || '-'}</td>
                             <td className="px-5 py-3.5">
                                 <span className="text-xs font-medium text-[#6B7280] bg-[#F3F4F6] px-2 py-0.5 rounded">{extractField(rec.flag_reason)}</span>
                             </td>

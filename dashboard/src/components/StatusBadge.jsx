@@ -12,11 +12,11 @@ const STYLES = {
 };
 
 export default function StatusBadge({ status, label }) {
-    const displayLabel = label || status || '—';
+    const displayLabel = label || status || '-';
     const s = STYLES[status] || STYLES.clean;
 
     return (
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide ${s.bg} ${s.text}`}>
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide transition-all duration-150 ${s.bg} ${s.text}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
             {displayLabel}
         </span>
