@@ -3,31 +3,31 @@ import { neon } from '@neondatabase/serverless';
 let sql = null;
 
 function getSQL() {
-    if (!sql) {
-        const connString = import.meta.env.VITE_NEON_CONNECTION_STRING;
-        if (!connString) {
-            throw new Error(
-                'VITE_NEON_CONNECTION_STRING is not set. Please configure this environment variable with your Neon PostgreSQL connection string.'
-            );
-        }
-        sql = neon(connString);
+  if (!sql) {
+    const connString = import.meta.env.VITE_NEON_CONNECTION_STRING;
+    if (!connString) {
+      throw new Error(
+        'VITE_NEON_CONNECTION_STRING is not set. Please configure this environment variable with your Neon PostgreSQL connection string.'
+      );
     }
-    return sql;
+    sql = neon(connString);
+  }
+  return sql;
 }
 
 export async function fetchPipelineRuns() {
-    const rows = await getSQL()`
+  const rows = await getSQL()`
     SELECT run_id, created_at, supplier_id, supplier_name,
            total_records, clean_records, flagged_records, duration_ms
     FROM pipeline_runs
     ORDER BY created_at DESC
   `;
-    return rows;
+  return rows;
 }
 
 export async function fetchPipelineRecords(runId) {
-    if (runId) {
-        const rows = await getSQL()`
+  if (runId) {
+    const rows = await getSQL()`
       SELECT record_id, run_id, supplier_id, sku_code, delivery_date,
              weight_kg, lead_time_days, origin_country, status,
              flag_reason, flag_severity, created_at
@@ -35,21 +35,21 @@ export async function fetchPipelineRecords(runId) {
       WHERE run_id = ${runId}
       ORDER BY created_at DESC
     `;
-        return rows;
-    }
-    const rows = await getSQL()`
+    return rows;
+  }
+  const rows = await getSQL()`
     SELECT record_id, run_id, supplier_id, sku_code, delivery_date,
            weight_kg, lead_time_days, origin_country, status,
            flag_reason, flag_severity, created_at
     FROM pipeline_records
     ORDER BY created_at DESC
   `;
-    return rows;
+  return rows;
 }
 
 export async function fetchFlaggedRecords(runId) {
-    if (runId) {
-        const rows = await getSQL()`
+  if (runId) {
+    const rows = await getSQL()`
       SELECT record_id, run_id, supplier_id, sku_code, delivery_date,
              weight_kg, lead_time_days, origin_country, status,
              flag_reason, flag_severity, created_at
@@ -57,9 +57,9 @@ export async function fetchFlaggedRecords(runId) {
       WHERE run_id = ${runId} AND status = 'flagged'
       ORDER BY created_at DESC
     `;
-        return rows;
-    }
-    const rows = await getSQL()`
+    return rows;
+  }
+  const rows = await getSQL()`
     SELECT record_id, run_id, supplier_id, sku_code, delivery_date,
            weight_kg, lead_time_days, origin_country, status,
            flag_reason, flag_severity, created_at
@@ -67,13 +67,13 @@ export async function fetchFlaggedRecords(runId) {
     WHERE status = 'flagged'
     ORDER BY created_at DESC
   `;
-    return rows;
+  return rows;
 }
 
 export async function fetchSupplierStats(dateFrom, dateTo) {
-    let rows;
-    if (dateFrom && dateTo) {
-        rows = await getSQL()`
+  let rows;
+  if (dateFrom && dateTo) {
+    rows = await getSQL()`
       SELECT
         pr.supplier_id,
         COALESCE(MAX(r.supplier_name), pr.supplier_id) AS supplier_name,
@@ -89,8 +89,8 @@ export async function fetchSupplierStats(dateFrom, dateTo) {
       GROUP BY pr.supplier_id
       ORDER BY flag_rate DESC
     `;
-    } else {
-        rows = await getSQL()`
+  } else {
+    rows = await getSQL()`
       SELECT
         pr.supplier_id,
         COALESCE(MAX(r.supplier_name), pr.supplier_id) AS supplier_name,
@@ -104,14 +104,14 @@ export async function fetchSupplierStats(dateFrom, dateTo) {
       GROUP BY pr.supplier_id
       ORDER BY flag_rate DESC
     `;
-    }
-    return rows;
+  }
+  return rows;
 }
 
 export async function fetchFlagBreakdown(dateFrom, dateTo) {
-    let rows;
-    if (dateFrom && dateTo) {
-        rows = await getSQL()`
+  let rows;
+  if (dateFrom && dateTo) {
+    rows = await getSQL()`
       SELECT
         pr.flag_reason,
         pr.flag_severity,
@@ -125,8 +125,8 @@ export async function fetchFlagBreakdown(dateFrom, dateTo) {
       GROUP BY pr.flag_reason, pr.flag_severity
       ORDER BY occurrence_count DESC
     `;
-    } else {
-        rows = await getSQL()`
+  } else {
+    rows = await getSQL()`
       SELECT
         pr.flag_reason,
         pr.flag_severity,
@@ -138,39 +138,49 @@ export async function fetchFlagBreakdown(dateFrom, dateTo) {
       GROUP BY pr.flag_reason, pr.flag_severity
       ORDER BY occurrence_count DESC
     `;
-    }
-    return rows;
+  }
+  return rows;
 }
 
 export async function fetchKPIs() {
-    const today = new Date().toISOString().slice(0, 10);
-    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  // Get the latest date from the database so KPIs show data even if not run today
+  const [{ latest_date }] = await getSQL()`
+        SELECT MAX(created_at::date) AS latest_date
+        FROM pipeline_runs
+    `;
 
-    const [todayStats] = await getSQL()`
+  if (!latest_date) {
+    return {
+      today: { total_records: 0, clean_records: 0, flagged_records: 0, active_suppliers: 0 },
+      yesterday: { total_records: 0, clean_records: 0, flagged_records: 0, active_suppliers: 0 }
+    };
+  }
+
+  const [todayStats] = await getSQL()`
     SELECT
       COALESCE(SUM(total_records), 0)  AS total_records,
       COALESCE(SUM(clean_records), 0)  AS clean_records,
       COALESCE(SUM(flagged_records), 0) AS flagged_records,
       COUNT(DISTINCT supplier_id)      AS active_suppliers
     FROM pipeline_runs
-    WHERE created_at::date = ${today}::date
+    WHERE created_at::date = ${latest_date}::date
   `;
 
-    const [yesterdayStats] = await getSQL()`
+  const [yesterdayStats] = await getSQL()`
     SELECT
       COALESCE(SUM(total_records), 0)  AS total_records,
       COALESCE(SUM(clean_records), 0)  AS clean_records,
       COALESCE(SUM(flagged_records), 0) AS flagged_records,
       COUNT(DISTINCT supplier_id)      AS active_suppliers
     FROM pipeline_runs
-    WHERE created_at::date = ${yesterday}::date
+    WHERE created_at::date = (${latest_date}::date - INTERVAL '1 day')::date
   `;
 
-    return { today: todayStats, yesterday: yesterdayStats };
+  return { today: todayStats, yesterday: yesterdayStats };
 }
 
 export async function fetchDailyVolume() {
-    const rows = await getSQL()`
+  const rows = await getSQL()`
     SELECT
       created_at::date AS day,
       COALESCE(SUM(clean_records), 0)  AS clean,
@@ -180,15 +190,15 @@ export async function fetchDailyVolume() {
     GROUP BY created_at::date
     ORDER BY day ASC
   `;
-    return rows;
+  return rows;
 }
 
 export async function fetchRunDetail(runId) {
-    const [run] = await getSQL()`
+  const [run] = await getSQL()`
     SELECT run_id, created_at, supplier_id, supplier_name,
            total_records, clean_records, flagged_records, duration_ms
     FROM pipeline_runs
     WHERE run_id = ${runId}
   `;
-    return run || null;
+  return run || null;
 }
